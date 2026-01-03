@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Observer Telemetry Event",
+  "description": "Standard format for telemetry events sent to Medical Mirror Observer",
+  "type": "object",
+  "required": ["type", "source", "event"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "OBSERVER_TELEMETRY",
+      "description": "Event type identifier"
+    },
+    "source": {
+      "type": "string",
+      "description": "Application name emitting the event",
+      "examples": ["athena-scraper", "clinical-workflow", "ehr-bridge"]
+    },
+    "event": {
+      "type": "object",
+      "required": ["stage", "action", "timestamp"],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "description": "Pipeline stage where event occurred",
+          "examples": [
+            "interceptor",
+            "injector",
+            "background",
+            "backend",
+            "fhir-converter",
+            "websocket",
+            "frontend"
+          ]
+        },
+        "action": {
+          "type": "string",
+          "description": "What happened at this stage",
+          "examples": [
+            "capture",
+            "forward",
+            "process",
+            "convert",
+            "broadcast",
+            "render",
+            "error"
+          ]
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action succeeded"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp"
+        },
+        "duration_ms": {
+          "type": "number",
+          "description": "Processing time in milliseconds"
+        },
+        "data": {
+          "type": "object",
+          "description": "Stage-specific data",
+          "properties": {
+            "url": { "type": "string" },
+            "method": { "type": "string" },
+            "status": { "type": "integer" },
+            "size": { "type": "integer" },
+            "patientId": { "type": "string" },
+            "recordType": { "type": "string" },
+            "errorMessage": { "type": "string" },
+            "errorStack": { "type": "string" }
+          }
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "ID to correlate events across pipeline stages"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "type": "OBSERVER_TELEMETRY",
+      "source": "athena-scraper",
+      "event": {
+        "stage": "interceptor",
+        "action": "capture",
+        "success": true,
+        "timestamp": "2024-01-15T10:30:00.000Z",
+        "duration_ms": 5,
+        "data": {
+          "url": "/ax/data?sources=active_medications",
+          "method": "GET",
+          "status": 200,
+          "size": 4521,
+          "patientId": "12345678"
+        },
+        "correlationId": "abc123"
+      }
+    }
+  ]
+}

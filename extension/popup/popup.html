@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Medical Mirror Observer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1e1b4b, #312e81);
+      padding: 12px 16px;
+      border-bottom: 1px solid #3730a3;
+    }
+
+    .header h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #c7d2fe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header .version {
+      font-size: 10px;
+      color: #818cf8;
+      font-weight: normal;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 12px 16px;
+    }
+
+    .stat {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1px solid #334155;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #10b981;
+    }
+
+    .stat-value.error { color: #ef4444; }
+
+    .sources {
+      padding: 0 16px 12px;
+    }
+
+    .sources h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .source-tag {
+      display: inline-block;
+      background: #1e3a5f;
+      color: #38bdf8;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      margin: 2px;
+    }
+
+    .no-sources {
+      color: #475569;
+      font-style: italic;
+      font-size: 11px;
+    }
+
+    .recent {
+      padding: 0 16px 12px;
+    }
+
+    .recent h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .event-list {
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .event-item {
+      background: #1e293b;
+      border-radius: 4px;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      font-size: 11px;
+      border-left: 3px solid #10b981;
+    }
+
+    .event-item.error {
+      border-left-color: #ef4444;
+    }
+
+    .event-stage {
+      color: #818cf8;
+      font-weight: 600;
+    }
+
+    .event-action {
+      color: #94a3b8;
+    }
+
+    .event-time {
+      color: #475569;
+      font-size: 10px;
+    }
+
+    .actions {
+      padding: 12px 16px;
+      border-top: 1px solid #334155;
+    }
+
+    button {
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn-clear {
+      background: #374151;
+      color: #d1d5db;
+    }
+
+    .btn-clear:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>
+      <span>Medical Mirror Observer</span>
+      <span class="version" id="version">v0.1.0</span>
+    </h1>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Events</div>
+      <div class="stat-value" id="event-count">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Errors</div>
+      <div class="stat-value error" id="error-count">0</div>
+    </div>
+  </div>
+
+  <div class="sources">
+    <h3>Observed Sources</h3>
+    <div id="sources-list">
+      <span class="no-sources">No sources detected yet</span>
+    </div>
+  </div>
+
+  <div class="recent">
+    <h3>Recent Events</h3>
+    <div class="event-list" id="event-list">
+      <div class="no-sources">No events recorded</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-clear" id="btn-clear">Clear All Events</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
