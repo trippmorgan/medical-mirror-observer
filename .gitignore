@@ -21,7 +21,9 @@ Thumbs.db
 
 # Storage (runtime data)
 storage/*.db
+server/data/
 
 # Environment
 .env
 .env.*
+!.env.example

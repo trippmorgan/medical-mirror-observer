@@ -4,8 +4,8 @@
  * =============================================================================
  *
  * Receives telemetry events from observer-injector.js and:
- * 1. Stores them in IndexedDB for persistence
- * 2. Analyzes patterns for anomalies
+ * 1. Forwards them to the backend server (primary)
+ * 2. Falls back to IndexedDB when server unavailable
  * 3. Updates badge with pipeline health status
  * 4. Exposes data to dashboard
  * =============================================================================
@@ -16,12 +16,27 @@ const DB_NAME = 'MirrorObserverDB';
 const DB_VERSION = 1;
 const MAX_EVENTS = 10000;  // Keep last N events
 
+// Server configuration (inline to avoid import issues in service worker)
+const SERVER_CONFIG = {
+  URL: 'http://localhost:3000',
+  ENDPOINTS: {
+    EVENTS: '/api/events',
+    STATS: '/api/events/stats'
+  },
+  TIMEOUT_MS: 5000,
+  RETRY_ATTEMPTS: 2,
+  RETRY_DELAY_MS: 1000,
+  USE_INDEXEDDB_FALLBACK: true
+};
+
 // State
 let db = null;
 let eventCount = 0;
 let errorCount = 0;
 let lastEventTime = null;
 let sourcesObserved = new Set();
+let serverAvailable = null;  // null = unknown, true/false = checked
+let serverEventCount = 0;    // Events successfully sent to server
 
 // Logging
 const Logger = {
@@ -35,7 +50,8 @@ const Logger = {
   success: (msg, data) => Logger._log('success', '✅', msg, data),
   warn: (msg, data) => Logger._log('warn', '⚠️', msg, data),
   error: (msg, data) => Logger._log('error', '❌', msg, data),
-  event: (msg, data) => Logger._log('event', '📡', msg, data)
+  event: (msg, data) => Logger._log('event', '📡', msg, data),
+  server: (msg, data) => Logger._log('server', '🌐', msg, data)
 };
 
 // Initialize IndexedDB
@@ -79,34 +95,117 @@ function initDB() {
   });
 }
 
-// Store event
-async function storeEvent(telemetry) {
+// Check if server is available
+async function checkServerHealth() {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SERVER_CONFIG.TIMEOUT_MS);
+
+    const response = await fetch(`${SERVER_CONFIG.URL}/health`, {
+      method: 'GET',
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+    serverAvailable = response.ok;
+    if (response.ok) {
+      Logger.server('Server connected');
+    }
+    return response.ok;
+  } catch (e) {
+    serverAvailable = false;
+    return false;
+  }
+}
+
+// Forward event to server
+async function forwardToServer(telemetry) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SERVER_CONFIG.TIMEOUT_MS);
+
+    const response = await fetch(`${SERVER_CONFIG.URL}${SERVER_CONFIG.ENDPOINTS.EVENTS}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(telemetry),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`Server returned ${response.status}`);
+    }
+
+    const result = await response.json();
+    serverAvailable = true;
+    serverEventCount++;
+    return { success: true, data: result };
+  } catch (error) {
+    serverAvailable = false;
+    Logger.warn('Server forwarding failed', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Store event in IndexedDB (fallback)
+async function storeInIndexedDB(telemetry) {
   if (!db) {
     Logger.warn('DB not ready, event dropped');
-    return;
+    return { success: false, error: 'DB not ready' };
   }
 
   const event = {
     ...telemetry,
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    storedAt: new Date().toISOString()
+    storedAt: new Date().toISOString(),
+    storedLocally: true  // Mark as stored locally (not sent to server)
   };
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const tx = db.transaction(['events'], 'readwrite');
     const store = tx.objectStore('events');
     store.add(event);
     tx.oncomplete = () => {
-      eventCount++;
-      lastEventTime = new Date();
-      if (telemetry.source) sourcesObserved.add(telemetry.source);
-      resolve();
+      resolve({ success: true, method: 'indexeddb' });
     };
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = () => {
+      resolve({ success: false, error: tx.error?.message });
+    };
   });
 }
 
-// Get recent events
+// Main event storage function - tries server first, falls back to IndexedDB
+async function storeEvent(telemetry) {
+  // Try server first
+  const serverResult = await forwardToServer(telemetry);
+
+  if (serverResult.success) {
+    // Update local stats even when server stores
+    eventCount++;
+    lastEventTime = new Date();
+    if (telemetry.source) sourcesObserved.add(telemetry.source);
+    return { stored: true, method: 'server', ...serverResult.data };
+  }
+
+  // Fallback to IndexedDB if enabled
+  if (SERVER_CONFIG.USE_INDEXEDDB_FALLBACK) {
+    const localResult = await storeInIndexedDB(telemetry);
+    if (localResult.success) {
+      eventCount++;
+      lastEventTime = new Date();
+      if (telemetry.source) sourcesObserved.add(telemetry.source);
+      return { stored: true, method: 'indexeddb' };
+    }
+    return { stored: false, error: localResult.error };
+  }
+
+  return { stored: false, error: 'Server unavailable, fallback disabled' };
+}
+
+// Get recent events from IndexedDB
 async function getRecentEvents(limit = 100) {
   if (!db) return [];
 
@@ -131,8 +230,9 @@ async function getRecentEvents(limit = 100) {
 
 // Update badge
 function updateBadge() {
-  const text = eventCount > 999 ? '999+' : eventCount.toString();
-  const color = errorCount > 0 ? '#ef4444' : '#10b981';
+  const count = eventCount;
+  const text = count > 999 ? '999+' : count.toString();
+  const color = errorCount > 0 ? '#ef4444' : (serverAvailable ? '#10b981' : '#f59e0b');
 
   chrome.action.setBadgeText({ text: text || '0' });
   chrome.action.setBadgeBackgroundColor({ color });
@@ -154,11 +254,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       errorCount++;
     }
 
-    // Store event
+    // Store event (server first, then IndexedDB fallback)
     storeEvent(message.payload)
-      .then(() => {
+      .then((result) => {
         updateBadge();
-        sendResponse({ stored: true, total: eventCount });
+        sendResponse({ ...result, total: eventCount });
       })
       .catch((e) => {
         Logger.error('Store failed', e);
@@ -175,7 +275,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       eventCount,
       errorCount,
       lastEventTime: lastEventTime?.toISOString(),
-      sources: Array.from(sourcesObserved)
+      sources: Array.from(sourcesObserved),
+      serverAvailable,
+      serverEventCount
     });
   }
 
@@ -195,6 +297,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       tx.oncomplete = () => {
         eventCount = 0;
         errorCount = 0;
+        serverEventCount = 0;
         updateBadge();
         sendResponse({ cleared: true });
       };
@@ -209,6 +312,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 Logger.info('═'.repeat(40));
 Logger.info(`Medical Mirror Observer v${OBSERVER_VERSION}`);
 Logger.info('Service worker starting...');
+
+// Check server connectivity
+checkServerHealth().then(available => {
+  if (available) {
+    Logger.server(`Connected to ${SERVER_CONFIG.URL}`);
+  } else {
+    Logger.warn(`Server not available at ${SERVER_CONFIG.URL}`);
+    Logger.info('Events will be stored locally in IndexedDB');
+  }
+});
 
 initDB()
   .then(() => {
