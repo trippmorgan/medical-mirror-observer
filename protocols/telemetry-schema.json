@@ -13,7 +13,7 @@
     "source": {
       "type": "string",
       "description": "Application name emitting the event",
-      "examples": ["athena-scraper", "clinical-workflow", "ehr-bridge"]
+      "examples": ["athena-scraper", "plaud-ai-uploader", "surgical-command-center"]
     },
     "event": {
       "type": "object",
@@ -29,7 +29,26 @@
             "backend",
             "fhir-converter",
             "websocket",
-            "frontend"
+            "frontend",
+            "upload",
+            "query",
+            "ai-query",
+            "ingest",
+            "data-quality",
+            "navigation",
+            "form",
+            "api",
+            "system",
+            "plaud-fetch",
+            "plaud-export",
+            "patient_lookup",
+            "procedure_create",
+            "voice_capture",
+            "transcription",
+            "nlp_extraction",
+            "field_update",
+            "procedure_save",
+            "imaging_fetch"
           ]
         },
         "action": {
@@ -42,7 +61,62 @@
             "convert",
             "broadcast",
             "render",
-            "error"
+            "error",
+            "init",
+            "TRANSCRIPT_SUBMITTED",
+            "PATIENTS_LOADED",
+            "RECORDS_RETRIEVED",
+            "RESPONSE_RECEIVED",
+            "UPLOAD_COMPLETENESS",
+            "TAB_SELECTED",
+            "FORM_SUBMITTED",
+            "fetch-patient",
+            "fetch-failed",
+            "fetch-not-found",
+            "export-event",
+            "export-failed",
+            "export-duplicate",
+            "SEARCH_INITIATED",
+            "SEARCH_COMPLETED",
+            "SEARCH_FAILED",
+            "PATIENT_SELECTED",
+            "PATIENT_NOT_FOUND",
+            "CREATE_INITIATED",
+            "CREATE_COMPLETED",
+            "CREATE_FAILED",
+            "PATIENT_LINKED",
+            "WS_CONNECTED",
+            "WS_DISCONNECTED",
+            "RECORDING_STARTED",
+            "RECORDING_STOPPED",
+            "AUDIO_UPLOADED",
+            "TRANSCRIBE_SENT",
+            "TRANSCRIBE_COMPLETED",
+            "TRANSCRIBE_FAILED",
+            "BROADCAST_SENT",
+            "EXTRACT_SENT",
+            "EXTRACT_COMPLETED",
+            "EXTRACT_FAILED",
+            "FIELD_MAPPED",
+            "FIELD_CHANGED",
+            "SYNC_BROADCAST",
+            "SYNC_RECEIVED",
+            "VALIDATION_ERROR",
+            "SAVE_INITIATED",
+            "SAVE_COMPLETED",
+            "SAVE_FAILED",
+            "STATUS_CHANGED",
+            "ULTRALINQ_LOGIN_STARTED",
+            "ULTRALINQ_LOGIN_COMPLETED",
+            "ULTRALINQ_LOGIN_FAILED",
+            "STUDIES_SEARCH_STARTED",
+            "STUDIES_RETRIEVED",
+            "STUDIES_EXTRACTION_FAILED",
+            "CLIENT_CONNECTED",
+            "CLIENT_REGISTERED",
+            "CLIENT_DISCONNECTED",
+            "MESSAGE_RECEIVED",
+            "MESSAGE_BROADCAST"
           ]
         },
         "success": {
@@ -60,17 +134,8 @@
         },
         "data": {
           "type": "object",
-          "description": "Stage-specific data",
-          "properties": {
-            "url": { "type": "string" },
-            "method": { "type": "string" },
-            "status": { "type": "integer" },
-            "size": { "type": "integer" },
-            "patientId": { "type": "string" },
-            "recordType": { "type": "string" },
-            "errorMessage": { "type": "string" },
-            "errorStack": { "type": "string" }
-          }
+          "description": "Stage-specific data - flexible schema to support multiple sources",
+          "additionalProperties": true
         },
         "correlationId": {
           "type": "string",
@@ -97,6 +162,80 @@
           "patientId": "12345678"
         },
         "correlationId": "abc123"
+      }
+    },
+    {
+      "type": "OBSERVER_TELEMETRY",
+      "source": "plaud-ai-uploader",
+      "event": {
+        "stage": "upload",
+        "action": "TRANSCRIPT_SUBMITTED",
+        "success": true,
+        "timestamp": "2024-01-15T11:00:00.000Z",
+        "duration_ms": 1250,
+        "data": {
+          "endpoint": "/upload",
+          "statusCode": 201,
+          "patientId": "patient_123",
+          "recordId": "rec_456",
+          "confidence": 95,
+          "category": "clinical-note"
+        },
+        "correlationId": "plaud_1705320000_abc123"
+      }
+    },
+    {
+      "type": "OBSERVER_TELEMETRY",
+      "source": "athena-scraper",
+      "event": {
+        "stage": "plaud-fetch",
+        "action": "fetch-patient",
+        "success": true,
+        "timestamp": "2024-01-15T12:00:00.000Z",
+        "duration_ms": 45,
+        "data": {
+          "patientId": "12345",
+          "eventCount": 47,
+          "lastUpdated": "2026-01-05T12:30:00Z",
+          "httpStatus": 200
+        },
+        "correlationId": "athena_12345_abc123"
+      }
+    },
+    {
+      "type": "OBSERVER_TELEMETRY",
+      "source": "athena-scraper",
+      "event": {
+        "stage": "plaud-export",
+        "action": "export-event",
+        "success": true,
+        "timestamp": "2024-01-15T12:05:00.000Z",
+        "duration_ms": 120,
+        "data": {
+          "patientId": "12345",
+          "eventType": "medication",
+          "plaudEventId": "uuid-from-plaud",
+          "httpStatus": 200
+        },
+        "correlationId": "athena_12345_abc123"
+      }
+    },
+    {
+      "type": "OBSERVER_TELEMETRY",
+      "source": "surgical-command-center",
+      "event": {
+        "stage": "transcription",
+        "action": "TRANSCRIBE_COMPLETED",
+        "success": true,
+        "timestamp": "2024-01-15T14:30:00.000Z",
+        "duration_ms": 450,
+        "data": {
+          "audioLength": 5.2,
+          "textLength": 156,
+          "confidence": 0.95,
+          "model": "whisper-large-v3"
+        },
+        "correlationId": "scc_proc_abc123"
       }
     }
   ]

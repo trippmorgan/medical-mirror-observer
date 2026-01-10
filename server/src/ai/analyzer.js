@@ -33,6 +33,7 @@ import { analyzeWithGemini, isGeminiAvailable } from './gemini.js';
 import { analyzeWithOpenAI, isOpenAIAvailable } from './openai.js';
 import { buildPrompt, ANALYSIS_TYPES } from './prompts.js';
 import { getEvents, saveAnalysis } from '../storage/file-store.js';
+import { generateReferencesFromAnalysis } from '../storage/references-store.js';
 
 // Create logger for this module
 const log = Logger('Analyzer');
@@ -226,6 +227,16 @@ export async function analyzeEvents(options) {
     analysisResult.savedTo = saved.savedTo;
     analysisResult.analysisId = saved.id;
     log.info(`Analysis saved: ${saved.id}`);
+
+    // Auto-generate shared references from analysis
+    const source = filters.source || 'default';
+    try {
+      const refs = await generateReferencesFromAnalysis(source, saved.id);
+      log.info(`Generated ${refs.recommendationCount} references for ${source}`);
+      analysisResult.referencesGenerated = refs.recommendationCount;
+    } catch (err) {
+      log.warn(`Failed to generate references: ${err.message}`);
+    }
   }
 
   return analysisResult;

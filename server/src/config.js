@@ -51,8 +51,8 @@ export const config = {
   // Port number for the HTTP server
   port: parseInt(process.env.PORT || '3000'),
 
-  // Host to bind the server to (use 0.0.0.0 for external access)
-  host: process.env.HOST || 'localhost',
+  // Host to bind the server to (0.0.0.0 allows external/Tailscale access)
+  host: process.env.HOST || '0.0.0.0',
 
   // Environment mode: 'development' or 'production'
   // Development mode shows more detailed error messages
@@ -111,13 +111,16 @@ export const config = {
   // ---------------------------------------------------------------------------
   // CORS CONFIGURATION
   // ---------------------------------------------------------------------------
-  // Cross-Origin Resource Sharing settings for the Chrome extension
+  // Cross-Origin Resource Sharing settings for the Chrome extension and network access
   cors: {
     // Allowed origins (regex patterns)
     origin: [
-      /^chrome-extension:\/\//,       // Allow any Chrome extension
-      /^http:\/\/localhost(:\d+)?$/,  // Allow localhost on any port
-      /^http:\/\/127\.0\.0\.1(:\d+)?$/ // Allow 127.0.0.1 on any port
+      /^chrome-extension:\/\//,        // Allow any Chrome extension
+      /^http:\/\/localhost(:\d+)?$/,   // Allow localhost on any port
+      /^http:\/\/127\.0\.0\.1(:\d+)?$/,// Allow 127.0.0.1 on any port
+      /^http:\/\/100\.\d+\.\d+\.\d+(:\d+)?$/,  // Allow Tailscale IPs (100.x.x.x)
+      /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,  // Allow local network (192.168.x.x)
+      /^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/    // Allow local network (10.x.x.x)
     ],
     // Allow cookies/auth headers to be sent
     credentials: true

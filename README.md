@@ -108,14 +108,24 @@ npm run dev
 
 Open `http://localhost:5173` in your browser.
 
-### 4. Connect Your App (e.g., athena-scraper)
+### 4. Connect Your App
 
-In your application, emit telemetry:
+There are three ways to send telemetry to the Observer:
 
+**Option A: Use an Integration Script (Recommended)**
+
+Load the pre-built telemetry client from the server:
+```html
+<script src="http://localhost:3000/integrations/plaud-ai-telemetry.js"></script>
+```
+
+**Option B: Via Chrome Extension (postMessage)**
+
+The Chrome extension listens for `postMessage` events:
 ```javascript
 window.postMessage({
   type: 'OBSERVER_TELEMETRY',
-  source: 'athena-scraper',  // Your app name
+  source: 'your-app-name',
   event: {
     stage: 'interceptor',
     action: 'capture',
@@ -124,6 +134,27 @@ window.postMessage({
     data: { patientId: '12345', recordType: 'vitals' }
   }
 }, '*');
+```
+
+**Option C: Direct HTTP POST**
+
+Send events directly to the server API:
+```javascript
+fetch('http://localhost:3000/api/events', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    type: 'OBSERVER_TELEMETRY',
+    source: 'your-app-name',
+    event: {
+      stage: 'upload',
+      action: 'TRANSCRIPT_SUBMITTED',
+      success: true,
+      timestamp: new Date().toISOString(),
+      data: { recordId: 'rec_123' }
+    }
+  })
+});
 ```
 
 ---
@@ -190,28 +221,39 @@ athena-scraper can optionally read this file to display warnings or auto-apply s
 | `/api/events` | POST | Receive telemetry |
 | `/api/events` | GET | Query events |
 | `/api/events/stats` | GET | Statistics |
+| `/api/events` | DELETE | Clear all events (dev/testing) |
 
 ### Analysis API
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/api/analyze` | GET | API usage info |
 | `/api/analyze` | POST | Run AI analysis |
 | `/api/analyze/history` | GET | Past analyses |
-| `/api/analyze/providers` | GET | Available AI |
+| `/api/analyze/providers` | GET | Available AI providers |
 
-### References API (NEW)
+### References API
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/references` | GET | Get all recommendations |
+| `/api/references/summary` | GET | Aggregated metrics only |
 | `/api/references/:source` | GET | Get recs for specific app |
 | `/api/references/:source` | PUT | Update recs (after analysis) |
+| `/api/references/generate` | POST | Generate refs from analysis |
 
 ### Export API
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/export` | GET | Download as JSON/CSV |
+
+### Static Files
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/integrations/*` | GET | Telemetry client scripts |
+| `/health` | GET | Server health check |
 
 ---
 
@@ -256,20 +298,25 @@ medical-mirror-observer/
 │   │   ├── routes/
 │   │   │   ├── events.js
 │   │   │   ├── analysis.js
-│   │   │   ├── references.js   # NEW: Shared recommendations
+│   │   │   ├── references.js   # Shared recommendations
 │   │   │   └── export.js
 │   │   ├── ai/             # AI analysis providers
 │   │   └── storage/
 │   └── data/
 │       ├── events/         # Telemetry events (by date)
 │       ├── analysis/       # AI analysis results
-│       └── references/     # Shared recommendations (NEW)
+│       └── references/     # Shared recommendations
 │
 ├── dashboard/              # React UI (view recommendations)
 │   ├── src/
 │   │   ├── components/
 │   │   └── pages/
 │   └── package.json
+│
+├── integrations/           # Telemetry client scripts for apps
+│   ├── README.md           # Integration guide
+│   ├── plaud-ai-telemetry.js      # Full client for Plaud AI
+│   └── plaud-ai-console-inject.js # Quick inject version
 │
 └── protocols/
     └── telemetry-schema.json

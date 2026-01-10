@@ -23,6 +23,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { config, validateConfig } from './config.js';
 import { initStorage, rotateOldFiles } from './storage/file-store.js';
 import { Logger, logRequest } from './utils/logger.js';
@@ -129,6 +131,29 @@ app.use('/api/export', exportRouter);
  */
 app.use('/api/references', referencesRouter);
 
+/**
+ * Integrations - /integrations
+ * - Static files for telemetry client scripts
+ * - Apps can load these to integrate with the Observer
+ * - CORS enabled for all origins to allow script injection
+ * - Helmet disabled for this route to allow cross-origin loading
+ */
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const integrationsPath = join(__dirname, '../../integrations');
+app.use('/integrations',
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  }),
+  (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET');
+    next();
+  },
+  express.static(integrationsPath)
+);
+
 // =============================================================================
 // ERROR HANDLING
 // =============================================================================
@@ -206,6 +231,7 @@ async function start() {
     console.log('  POST /api/analyze      - Run AI analysis');
     console.log('  GET  /api/references   - Shared recommendations');
     console.log('  GET  /api/export       - Download events');
+    console.log('  GET  /integrations     - Telemetry client scripts');
     console.log('  GET  /health           - Health check');
     console.log('-'.repeat(50) + '\n');
   });
