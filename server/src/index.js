@@ -32,6 +32,9 @@ import eventsRouter from './routes/events.js';
 import analysisRouter from './routes/analysis.js';
 import exportRouter from './routes/export.js';
 import referencesRouter from './routes/references.js';
+import orchestratorRouter from './routes/orchestrator.js';
+import ultrasoundRouter from './routes/ultrasound.js';
+import claudeTeamClient from './integrations/claude-team-client.js';
 
 // Create logger instance for this module
 const log = Logger('Server');
@@ -132,6 +135,20 @@ app.use('/api/export', exportRouter);
 app.use('/api/references', referencesRouter);
 
 /**
+ * Orchestrator - /api/orchestrator
+ * - Multi-agent workflow orchestration
+ * - Coordinates Observer, Claude Team, Browser Bridge, and SCC
+ */
+app.use('/api/orchestrator', orchestratorRouter);
+
+/**
+ * Ultrasound Analysis Routes (UltraLinq Integration)
+ * - POST /api/ultrasound/analyze - Analyze ultrasound findings
+ * - GET /api/ultrasound/cpt-codes - Get CPT code reference
+ */
+app.use('/api/ultrasound', ultrasoundRouter);
+
+/**
  * Integrations - /integrations
  * - Static files for telemetry client scripts
  * - Apps can load these to integrate with the Observer
@@ -153,6 +170,29 @@ app.use('/integrations',
   },
   express.static(integrationsPath)
 );
+
+// =============================================================================
+// CLAUDE TEAM STATUS
+// =============================================================================
+
+/**
+ * Claude Team hub connection status
+ */
+app.get('/api/claude-team/status', (req, res) => {
+  res.json(claudeTeamClient.getConnectionStatus());
+});
+
+/**
+ * Broadcast message to Claude Team hub
+ */
+app.post('/api/claude-team/broadcast', express.json(), (req, res) => {
+  const { message, category } = req.body;
+  if (!message) {
+    return res.status(400).json({ error: 'Message required' });
+  }
+  const sent = claudeTeamClient.broadcast(message, category || 'update');
+  res.json({ sent, message: sent ? 'Broadcast sent' : 'Not connected to hub' });
+});
 
 // =============================================================================
 // ERROR HANDLING
@@ -234,6 +274,16 @@ async function start() {
     console.log('  GET  /integrations     - Telemetry client scripts');
     console.log('  GET  /health           - Health check');
     console.log('-'.repeat(50) + '\n');
+
+    // Step 4b: Connect to Claude Team hub (optional)
+    if (process.env.CLAUDE_TEAM_ENABLED !== 'false') {
+      try {
+        claudeTeamClient.connectToHub();
+        log.info('Claude Team hub connection initiated');
+      } catch (err) {
+        log.warn('Claude Team hub connection failed (non-fatal):', err.message);
+      }
+    }
   });
 
   // Step 5: Schedule daily file rotation (cleanup old files)

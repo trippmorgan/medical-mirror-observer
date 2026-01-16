@@ -8,8 +8,16 @@
  * 2. Falls back to IndexedDB when server unavailable
  * 3. Updates badge with pipeline health status
  * 4. Exposes data to dashboard
+ * 5. Connects to MCP Browser Bridge for Claude Code integration
  * =============================================================================
  */
+
+// Import Browser Bridge client for Claude Code integration
+try {
+  importScripts('browser-bridge-client.js');
+} catch (e) {
+  console.warn('[Mirror Observer] Browser bridge client not loaded:', e.message);
+}
 
 const OBSERVER_VERSION = '0.1.0';
 const DB_NAME = 'MirrorObserverDB';
@@ -301,6 +309,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         updateBadge();
         sendResponse({ cleared: true });
       };
+    }
+    return true;
+  }
+
+  // Browser Bridge status (for Claude Code integration)
+  if (message.type === 'GET_BRIDGE_STATUS') {
+    const status = typeof BrowserBridge !== 'undefined'
+      ? BrowserBridge.getStatus()
+      : { connected: false, error: 'Bridge not loaded' };
+    sendResponse(status);
+    return true;
+  }
+
+  // Connect to Browser Bridge manually
+  if (message.type === 'CONNECT_BRIDGE') {
+    if (typeof BrowserBridge !== 'undefined') {
+      BrowserBridge.connect();
+      sendResponse({ connecting: true });
+    } else {
+      sendResponse({ error: 'Bridge not available' });
     }
     return true;
   }

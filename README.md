@@ -355,3 +355,11 @@ that would take hours to discover manually.
 ## License
 
 Private - Medical use only
+ Tools for claude-team (4 tools)                                                                                                           │
+│                                                                                                                                           │
+│ ❯ 1. ask_team_claude                                                                                                                      │
+│   2. share_with_team                                                                                                                      │
+│   3. get_team_status                                                                                                                      │
+│   4. request_code_review                                                                                                                  │
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+   Esc to go back
