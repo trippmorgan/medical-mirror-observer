@@ -25,6 +25,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
 import { config, validateConfig } from './config.js';
 import { initStorage, rotateOldFiles } from './storage/file-store.js';
 import { Logger, logRequest } from './utils/logger.js';
@@ -35,6 +37,7 @@ import referencesRouter from './routes/references.js';
 import orchestratorRouter from './routes/orchestrator.js';
 import ultrasoundRouter from './routes/ultrasound.js';
 import claudeTeamClient from './integrations/claude-team-client.js';
+import { addPartnerClient, removePartnerClient, getPartnerCount } from './integrations/partner-broadcast.js';
 
 // Create logger instance for this module
 const log = Logger('Server');
@@ -257,10 +260,64 @@ async function start() {
     log.info(`Rotated ${rotation.deleted} old file(s)`);
   }
 
-  // Step 4: Start HTTP server
-  app.listen(config.port, config.host, () => {
+  // Step 4: Create HTTP server and WebSocket server
+  const server = createServer(app);
+
+  // WebSocket server for /partner endpoint (SCC UI connection)
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Handle WebSocket upgrade requests
+  server.on('upgrade', (request, socket, head) => {
+    const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+
+    if (pathname === '/partner') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
+
+  // Handle partner WebSocket connections
+  wss.on('connection', (ws) => {
+    log.info('[Partner WS] SCC UI connected');
+    addPartnerClient(ws);
+
+    // Send welcome message
+    ws.send(JSON.stringify({
+      type: 'connected',
+      message: 'Connected to Medical Mirror Observer',
+      timestamp: new Date().toISOString(),
+      partnerCount: getPartnerCount()
+    }));
+
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        log.debug('[Partner WS] Received:', message.type || 'unknown');
+        // Handle incoming messages from SCC UI if needed
+      } catch (err) {
+        log.error('[Partner WS] Parse error:', err.message);
+      }
+    });
+
+    ws.on('close', () => {
+      log.info('[Partner WS] SCC UI disconnected');
+      removePartnerClient(ws);
+    });
+
+    ws.on('error', (err) => {
+      log.error('[Partner WS] Error:', err.message);
+      removePartnerClient(ws);
+    });
+  });
+
+  // Start the server
+  server.listen(config.port, config.host, () => {
     log.info(`Server listening on http://${config.host}:${config.port}`);
     log.info('Ready to receive telemetry events');
+    log.info(`WebSocket partner endpoint: ws://${config.host}:${config.port}/partner`);
 
     // Log available endpoints for reference
     console.log('\n' + '-'.repeat(50));
@@ -273,6 +330,7 @@ async function start() {
     console.log('  GET  /api/export       - Download events');
     console.log('  GET  /integrations     - Telemetry client scripts');
     console.log('  GET  /health           - Health check');
+    console.log('  WS   /partner          - SCC UI WebSocket');
     console.log('-'.repeat(50) + '\n');
 
     // Step 4b: Connect to Claude Team hub (optional)

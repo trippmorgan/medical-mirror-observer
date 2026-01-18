@@ -28,6 +28,7 @@ import {
   getStats,
   clearEvents
 } from '../storage/file-store.js';
+import { broadcastToPartners } from '../integrations/partner-broadcast.js';
 
 // Create logger for this module
 const log = Logger('Events');
@@ -126,6 +127,13 @@ router.post('/', async (req, res, next) => {
     const result = await storeEvent(telemetry);
 
     log.info(`Stored event ${result.eventId} from ${telemetry.source}`);
+
+    // Broadcast to connected SCC UI partners
+    broadcastToPartners({
+      ...telemetry,
+      id: result.eventId,
+      receivedAt: result.storedAt
+    });
 
     res.status(201).json({
       success: true,
